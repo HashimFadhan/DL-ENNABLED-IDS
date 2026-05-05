@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Settings – CIC-IDS</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+  <style>
+    body{padding-top:62px;background:#f1f5f9;}
+    .navbar{background:linear-gradient(135deg,#2563eb,#0ea5e9);}
+    .card{border:none;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.08);}
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand fw-bold" href="/"><i class="fas fa-shield-halved me-2"></i>CIC-IDS Monitor</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav">
+        <li class="nav-item"><a class="nav-link" href="/">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="/alerts">Alerts</a></li>
+        <li class="nav-item"><a class="nav-link active" href="/settings">Settings</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container px-4" style="max-width:720px">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="alert alert-{{ cat }} alert-dismissible fade show mt-2">
+        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+
+  <!-- System status -->
+  <div class="card p-3 mb-3">
+    <div class="fw-semibold mb-2"><i class="fas fa-server me-1 text-primary"></i>System Status</div>
+    <div id="sys-status-block" class="small text-muted">Loading…</div>
+  </div>
+
+  <!-- Settings form -->
+  <div class="card p-4">
+    <h5 class="mb-4"><i class="fas fa-gear me-2 text-primary"></i>Configuration</h5>
+    <form method="POST" action="/settings">
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Capture Interface</label>
+        <select class="form-select" name="interface">
+          {% for iface, ip in interfaces %}
+            <option value="{{ iface }}" {% if config and config.capture_interface==iface %}selected{% endif %}>
+              {{ iface }}  ({{ ip }})
+            </option>
+          {% endfor %}
+        </select>
+        <div class="form-text">Restart required after changing interface.</div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Detection Methods</label>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="ml_enabled" id="ml"
+            {% if not config or config.ml_detection_enabled %}checked{% endif %}>
+          <label class="form-check-label" for="ml">
+            <i class="fas fa-brain me-1 text-primary"></i>Machine Learning (Random Forest, Gradient Boosting, MLP)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="signature_enabled" id="sig"
+            {% if not config or config.signature_detection_enabled %}checked{% endif %}>
+          <label class="form-check-label" for="sig">
+            <i class="fas fa-fingerprint me-1 text-danger"></i>Signature-Based Detection
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="anomaly_enabled" id="anom"
+            {% if not config or config.anomaly_detection_enabled %}checked{% endif %}>
+          <label class="form-check-label" for="anom">
+            <i class="fas fa-chart-line me-1 text-warning"></i>Statistical Anomaly Detection
+          </label>
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Alert Threshold <span class="text-muted fw-normal">(0–10)</span></label>
+          <input class="form-control" type="number" name="threshold" min="0" max="10"
+            value="{{ config.alert_threshold if config else 3 }}">
+          <div class="form-text">Minimum risk score needed to create an alert.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Packet Buffer Size</label>
+          <input class="form-control" type="number" name="buffer_size" min="100" max="10000"
+            value="{{ config.packet_buffer_size if config else 1000 }}">
+          <div class="form-text">Packets collected before analysis batch runs.</div>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Log Level</label>
+        <select class="form-select" name="log_level">
+          {% for lvl in ['DEBUG','INFO','WARNING','ERROR'] %}
+            <option {% if config and config.log_level==lvl %}selected{% endif %}>{{ lvl }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-primary px-4">
+        <i class="fas fa-floppy-disk me-2"></i>Save Settings
+      </button>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+async function loadStatus(){
+  try{
+    const s = await fetch('/api/system/status').then(r=>r.json());
+    document.getElementById('sys-status-block').innerHTML = `
+      <div class="row g-2">
+        <div class="col-6 col-md-3">
+          <div class="p-2 rounded bg-white border text-center">
+            <div class="small text-muted">Capture</div>
+            <div class="fw-bold ${s.capture_running?'text-success':'text-danger'}">
+              ${s.capture_running?'Running':'Stopped'}
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="p-2 rounded bg-white border text-center">
+            <div class="small text-muted">Uptime</div>
+            <div class="fw-bold">${Math.floor((s.uptime_seconds||0)/60)} min</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="p-2 rounded bg-white border text-center">
+            <div class="small text-muted">Packets</div>
+            <div class="fw-bold">${(s.processed_packets||0).toLocaleString()}</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="p-2 rounded bg-white border text-center">
+            <div class="small text-muted">Total Alerts</div>
+            <div class="fw-bold">${s.total_alerts||0}</div>
+          </div>
+        </div>
+      </div>`;
+  }catch(e){
+    document.getElementById('sys-status-block').textContent = 'Could not load status.';
+  }
+}
+loadStatus();
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+Flask==2.3.3
+Flask-SQLAlchemy==3.1.1
+Werkzeug==2.3.7
+pandas==2.1.4
+numpy==1.26.4
+scikit-learn==1.4.2
+joblib==1.3.2
+python-dotenv==1.0.1
+scapy==2.5.0
+
+# netifaces is OPTIONAL (requires C compiler on Windows).
+# Install only if you have Microsoft C++ Build Tools:
+#   pip install netifaces
+# The app works perfectly without it.

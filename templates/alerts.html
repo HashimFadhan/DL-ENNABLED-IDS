@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Alerts – CIC-IDS</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+  <style>
+    body{padding-top:62px;background:#f1f5f9;}
+    .navbar{background:linear-gradient(135deg,#2563eb,#0ea5e9);}
+    .card{border:none;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.08);}
+    .badge-High{background:#fee2e2;color:#991b1b;}
+    .badge-Medium{background:#fef3c7;color:#92400e;}
+    .badge-Low{background:#d1fae5;color:#065f46;}
+    tr.clickable:hover{background:#f8fafc;cursor:pointer;}
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand fw-bold" href="/"><i class="fas fa-shield-halved me-2"></i>CIC-IDS Monitor</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav">
+        <li class="nav-item"><a class="nav-link" href="/">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link active" href="/alerts">Alerts</a></li>
+        <li class="nav-item"><a class="nav-link" href="/settings">Settings</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid px-4">
+  <div class="card p-3">
+    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+      <h5 class="mb-0"><i class="fas fa-triangle-exclamation me-2 text-warning"></i>Security Alerts</h5>
+      <div class="d-flex gap-2">
+        <div class="btn-group btn-group-sm">
+          <button class="btn btn-outline-secondary filter active" data-level="all">All</button>
+          <button class="btn btn-outline-danger   filter" data-level="High">High</button>
+          <button class="btn btn-outline-warning  filter" data-level="Medium">Medium</button>
+          <button class="btn btn-outline-success  filter" data-level="Low">Low</button>
+        </div>
+        <div class="btn-group btn-group-sm">
+          <button class="btn btn-outline-secondary res active" data-res="all">All</button>
+          <button class="btn btn-outline-primary   res" data-res="false">Open</button>
+          <button class="btn btn-outline-success   res" data-res="true">Resolved</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>#</th><th>Timestamp</th><th>Source IP</th>
+            <th>Level</th><th>Score</th><th>Description</th>
+            <th>Status</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="8" class="text-center py-4 text-muted">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="text-muted small mt-2" id="count-label"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let lvl='all', res='all';
+const LBL={High:'badge-High',Medium:'badge-Medium',Low:'badge-Low'};
+
+async function load(){
+  let url=`/api/alerts?limit=200`;
+  if(lvl!=='all') url+=`&level=${lvl}`;
+  if(res!=='all') url+=`&resolved=${res}`;
+  const data = await fetch(url).then(r=>r.json());
+  const tb = document.getElementById('tbody');
+  document.getElementById('count-label').textContent = `Showing ${data.length} alert(s)`;
+  if(!data.length){
+    tb.innerHTML='<tr><td colspan="8" class="text-center py-4 text-muted">No alerts match the current filter</td></tr>';
+    return;
+  }
+  tb.innerHTML = data.map(a=>`
+    <tr class="clickable" onclick="location.href='/alert/${a.id}'">
+      <td>${a.id}</td>
+      <td><small>${a.timestamp}</small></td>
+      <td><code>${a.source_ip}</code></td>
+      <td><span class="badge ${LBL[a.risk_level]||'bg-secondary'}">${a.risk_level}</span></td>
+      <td>${(a.risk_score||0).toFixed(1)}</td>
+      <td class="text-truncate" style="max-width:280px"><small>${a.description||''}</small></td>
+      <td>${a.resolved
+          ? '<span class="badge bg-success">Resolved</span>'
+          : '<span class="badge bg-warning text-dark">Open</span>'}</td>
+      <td>
+        <a href="/alert/${a.id}" class="btn btn-sm btn-outline-primary py-0 me-1">Trace</a>
+        ${!a.resolved
+          ? `<button class="btn btn-sm btn-outline-success py-0" onclick="event.stopPropagation();resolve(${a.id})">Resolve</button>`
+          : ''}
+      </td>
+    </tr>`).join('');
+}
+
+async function resolve(id){
+  await fetch(`/api/alerts/${id}`,{method:'PUT',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({resolved:true})});
+  load();
+}
+
+document.querySelectorAll('.filter').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.filter').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); lvl=b.dataset.level; load();
+}));
+document.querySelectorAll('.res').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.res').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); res=b.dataset.res; load();
+}));
+
+load(); setInterval(load,10000);
+</script>
+</body>
+</html>

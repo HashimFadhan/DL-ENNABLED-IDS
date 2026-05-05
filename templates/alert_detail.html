@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Alert Trace #{{ alert.id }} – CIC-IDS</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+  <style>
+    body{padding-top:62px;background:#f1f5f9;}
+    .navbar{background:linear-gradient(135deg,#2563eb,#0ea5e9);}
+    .card{border:none;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.08);margin-bottom:1rem;}
+    .method-badge{font-size:.78rem;padding:.3em .7em;border-radius:999px;}
+    pre.feature-box{background:#1e293b;color:#e2e8f0;border-radius:10px;
+                    padding:1rem;font-size:.78rem;max-height:360px;overflow-y:auto;}
+    .score-circle{width:80px;height:80px;border-radius:50%;display:flex;
+                  align-items:center;justify-content:center;font-size:1.6rem;font-weight:700;}
+    .timeline-dot{width:12px;height:12px;border-radius:50%;background:#2563eb;flex-shrink:0;}
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand fw-bold" href="/"><i class="fas fa-shield-halved me-2"></i>CIC-IDS Monitor</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav">
+        <li class="nav-item"><a class="nav-link" href="/">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="/alerts">Alerts</a></li>
+        <li class="nav-item"><a class="nav-link" href="/settings">Settings</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid px-4" id="main-content">
+  <div class="d-flex align-items-center gap-3 mb-3">
+    <a href="/alerts" class="btn btn-sm btn-outline-secondary">← Back</a>
+    <h5 class="mb-0">Alert Trace  <span class="text-muted">#{{ alert.id }}</span></h5>
+    <span id="level-badge" class="badge fs-6"></span>
+  </div>
+
+  <!-- Top summary -->
+  <div class="row g-3 mb-1">
+    <div class="col-md-4">
+      <div class="card p-3 h-100">
+        <div class="fw-semibold mb-3"><i class="fas fa-circle-info me-1 text-primary"></i>Summary</div>
+        <table class="table table-sm mb-0">
+          <tr><th class="text-muted fw-normal">Alert ID</th><td>#{{ alert.id }}</td></tr>
+          <tr><th class="text-muted fw-normal">Timestamp</th><td id="ts">{{ alert.timestamp }}</td></tr>
+          <tr><th class="text-muted fw-normal">Source IP</th><td><code>{{ alert.source_ip }}</code></td></tr>
+          <tr><th class="text-muted fw-normal">Risk Level</th><td id="tbl-level"></td></tr>
+          <tr><th class="text-muted fw-normal">Risk Score</th><td id="tbl-score"></td></tr>
+          <tr><th class="text-muted fw-normal">Status</th><td id="tbl-status"></td></tr>
+        </table>
+        <button id="resolve-btn" class="btn btn-sm btn-success mt-3 d-none"
+                onclick="resolveAlert()">
+          <i class="fas fa-check me-1"></i>Mark Resolved
+        </button>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card p-3 h-100">
+        <div class="fw-semibold mb-3"><i class="fas fa-route me-1 text-primary"></i>Network Flow</div>
+        <table class="table table-sm mb-0" id="flow-table">
+          <tr><td colspan="2" class="text-muted">Loading…</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card p-3 h-100">
+        <div class="fw-semibold mb-3"><i class="fas fa-microscope me-1 text-primary"></i>Detection Methods</div>
+        <div id="methods-list"><div class="text-muted small">Loading…</div></div>
+        <hr class="my-2"/>
+        <div class="fw-semibold mb-1 small">Trigger</div>
+        <div id="trigger-text" class="small text-muted"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Features + Correlated -->
+  <div class="row g-3">
+    <div class="col-md-7">
+      <div class="card p-3">
+        <div class="fw-semibold mb-2"><i class="fas fa-table me-1 text-primary"></i>Feature Snapshot</div>
+        <div class="input-group input-group-sm mb-2">
+          <span class="input-group-text"><i class="fas fa-search"></i></span>
+          <input type="text" class="form-control" id="feat-search" placeholder="Filter features…"/>
+        </div>
+        <pre class="feature-box" id="feature-box">Loading…</pre>
+      </div>
+    </div>
+    <div class="col-md-5">
+      <div class="card p-3 h-100">
+        <div class="fw-semibold mb-2"><i class="fas fa-link me-1 text-primary"></i>Correlated Alerts
+          <span class="badge bg-secondary ms-1" id="corr-count">0</span>
+        </div>
+        <div id="corr-list" class="small">
+          <div class="text-muted">Loading…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notes -->
+  <div class="card p-3">
+    <div class="fw-semibold mb-2"><i class="fas fa-note-sticky me-1 text-primary"></i>Notes</div>
+    <pre id="notes-box" class="mb-0 small text-muted" style="white-space:pre-wrap">—</pre>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const ALERT_ID = {{ alert.id }};
+const COLORS   = {High:'#dc2626',Medium:'#d97706',Low:'#16a34a'};
+const LABELS   = {High:'badge-High text-danger border border-danger',
+                  Medium:'badge-Medium text-warning border border-warning',
+                  Low:'badge-Low text-success border border-success'};
+
+let allFeatures = {};
+
+async function loadTrace(){
+  const data = await fetch(`/api/alerts/${ALERT_ID}/trace`).then(r=>r.json());
+  const a = data.alert;
+
+  // Header badge
+  const lvl = a.risk_level;
+  const lb  = document.getElementById('level-badge');
+  lb.textContent = lvl;
+  lb.className   = `badge fs-6 bg-${lvl==='High'?'danger':lvl==='Medium'?'warning text-dark':'success'}`;
+
+  // Summary
+  document.getElementById('tbl-level').innerHTML =
+    `<span class="badge bg-${lvl==='High'?'danger':lvl==='Medium'?'warning text-dark':'success'}">${lvl}</span>`;
+  document.getElementById('tbl-score').innerHTML =
+    `<strong style="color:${COLORS[lvl]||'#333'}">${(a.risk_score||0).toFixed(2)} / 10</strong>`;
+  document.getElementById('tbl-status').innerHTML = a.resolved
+    ? '<span class="badge bg-success">Resolved</span>'
+    : '<span class="badge bg-warning text-dark">Open</span>';
+
+  if(!a.resolved)
+    document.getElementById('resolve-btn').classList.remove('d-none');
+
+  // Flow
+  const f = data.flow || {};
+  document.getElementById('flow-table').innerHTML = `
+    <tr><th class="text-muted fw-normal">Src IP</th><td><code>${f.src_ip||'—'}</code></td></tr>
+    <tr><th class="text-muted fw-normal">Src Port</th><td>${f.src_port||'—'}</td></tr>
+    <tr><th class="text-muted fw-normal">Dst IP</th><td><code>${f.dst_ip||'—'}</code></td></tr>
+    <tr><th class="text-muted fw-normal">Dst Port</th><td>${f.dst_port||'—'}</td></tr>
+    <tr><th class="text-muted fw-normal">Protocol</th><td>${{6:'TCP',17:'UDP',1:'ICMP'}[f.protocol]||f.protocol||'—'}</td></tr>
+    <tr><th class="text-muted fw-normal">Duration</th><td>${f.duration_us ? (f.duration_us/1e6).toFixed(3)+' s' : '—'}</td></tr>
+    <tr><th class="text-muted fw-normal">Bytes</th><td>${(f.bytes||0).toLocaleString()}</td></tr>
+    <tr><th class="text-muted fw-normal">Packets</th><td>${f.packets||'—'}</td></tr>
+    <tr><th class="text-muted fw-normal">ASN</th><td>${(data.asn||{}).asn||'—'} ${(data.asn||{}).org||''}</td></tr>`;
+
+  // Detection methods
+  const methods = data.detection_methods || [];
+  const mColors = {ML:'primary',Signature:'danger',Anomaly:'warning',Reputation:'dark',Other:'secondary'};
+  document.getElementById('methods-list').innerHTML = methods.length
+    ? methods.map(m=>`
+        <div class="mb-2">
+          <span class="badge bg-${mColors[m.method]||'secondary'} method-badge me-1">${m.method}</span>
+          <small class="text-muted">${m.detail}</small>
+        </div>`).join('')
+    : '<div class="text-muted small">No method details</div>';
+
+  document.getElementById('trigger-text').textContent = (data.trace||{}).trigger || a.description || '—';
+
+  // Features
+  allFeatures = data.features || {};
+  renderFeatures('');
+
+  // Correlated
+  const corr = data.correlated || [];
+  document.getElementById('corr-count').textContent = corr.length;
+  if(!corr.length){
+    document.getElementById('corr-list').innerHTML = '<div class="text-muted">No correlated alerts</div>';
+  } else {
+    document.getElementById('corr-list').innerHTML = corr.map(c=>`
+      <div class="d-flex align-items-start gap-2 mb-2 pb-2 border-bottom">
+        <span class="badge bg-${c.risk_level==='High'?'danger':c.risk_level==='Medium'?'warning text-dark':'success'} mt-1">${c.risk_level}</span>
+        <div>
+          <a href="/alert/${c.id}" class="text-decoration-none fw-semibold">#${c.id}</a>
+          <span class="text-muted ms-1 small">${c.timestamp}</span><br/>
+          <small class="text-muted">${(c.description||'').substring(0,80)}</small>
+        </div>
+      </div>`).join('');
+  }
+
+  // Notes
+  document.getElementById('notes-box').textContent = a.notes || '—';
+}
+
+function renderFeatures(filter){
+  const filtered = Object.entries(allFeatures)
+    .filter(([k,v])=> !filter || k.toLowerCase().includes(filter.toLowerCase())
+                               || String(v).toLowerCase().includes(filter.toLowerCase()))
+    .sort(([a],[b])=>a.localeCompare(b));
+
+  document.getElementById('feature-box').textContent =
+    filtered.length
+      ? filtered.map(([k,v])=>`${k.padEnd(38)}: ${v}`).join('\n')
+      : '(no matching features)';
+}
+
+document.getElementById('feat-search').addEventListener('input', e=>{
+  renderFeatures(e.target.value);
+});
+
+async function resolveAlert(){
+  await fetch(`/api/alerts/${ALERT_ID}`,{method:'PUT',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({resolved:true})});
+  loadTrace();
+}
+
+loadTrace();
+</script>
+</body>
+</html>

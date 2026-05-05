@@ -1,0 +1,66 @@
+{
+  "name": "FTP-BruteForce",
+  "description": "Auto-generated from 99885 samples",
+  "rules": [
+    {
+      "feature": "Fwd Pkts/s",
+      "operator": ">",
+      "threshold": 1030.385814,
+      "weight": 1858.648
+    },
+    {
+      "feature": "Flow Pkts/s",
+      "operator": ">",
+      "threshold": 2060.262872,
+      "weight": 1858.01
+    },
+    {
+      "feature": "Bwd Pkts/s",
+      "operator": ">",
+      "threshold": 1029.88496,
+      "weight": 1857.2456
+    },
+    {
+      "feature": "Down/Up Ratio",
+      "operator": ">",
+      "threshold": 1.021482,
+      "weight": 2.9297
+    },
+    {
+      "feature": "Init Fwd Win Byts",
+      "operator": ">",
+      "threshold": 32900.608118,
+      "weight": 2.3356
+    },
+    {
+      "feature": "Fwd Seg Size Min",
+      "operator": ">",
+      "threshold": 57.789042,
+      "weight": 1.8138
+    },
+    {
+      "feature": "PSH Flag Cnt",
+      "operator": ">",
+      "threshold": 1.809691,
+      "weight": 1.3184
+    },
+    {
+      "feature": "Flow Duration",
+      "operator": "<",
+      "threshold": -101597627.489781,
+      "weight": 1.1501
+    },
+    {
+      "feature": "Flow IAT Max",
+      "operator": "<",
+      "threshold": -51043142.63411,
+      "weight": 1.1494
+    },
+    {
+      "feature": "Fwd IAT Tot",
+      "operator": "<",
+      "threshold": -101788043.265533,
+      "weight": 1.1482
+    }
+  ]
+}
